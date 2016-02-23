@@ -20,7 +20,7 @@
 
 %% API
 -export([start_link/4, init/0, configure/1, create/4, find/1, pull/2, pull_no_wait/2, poll/1, send/2, recv/2,
-         send_message/2, send_obj/2, refresh/1, disconnect/1, unsub_caller/2]).
+         send_message/2, send_obj/2, refresh/1, disconnect/1, unsub_caller/2, send_event/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -80,6 +80,9 @@ send(Pid, Message) ->
 
 send_message(Pid, Message) when is_binary(Message) ->
     gen_server:cast(Pid, {send, {message, <<>>, <<>>, Message}}).
+
+send_event(Pid, Event, Message) ->
+    gen_server:cast(Pid, {send, {event, Event, Message}}).
 
 send_obj(Pid, Obj) ->
     gen_server:cast(Pid, {send, {json, <<>>, <<>>, Obj}}).
@@ -253,7 +256,12 @@ process_messages([Message|Rest], State = #state{id = SessionId, callback = Callb
                 {disconnect, NewSessionState} ->
                     {stop, normal, ok, State#state{session_state = NewSessionState}}
             end;
-        _ ->
-            %% Skip message
-            process_messages(Rest, State)
+        {event, <<>>, EndPoint, EventName, EventArgs} ->
+            Msg = {event, EndPoint, EventName, EventArgs},
+            case Callback:recv(self(), SessionId, Msg, SessionState) of
+                {ok, NewSessionState} ->
+                    process_messages(Rest, State#state{session_state = NewSessionState});
+                {disconnect, NewSessionState} ->
+                    {stop, normal, ok, State#state{session_state = NewSessionState}}
+            end
     end.
