@@ -74,8 +74,9 @@ handle(Req, HttpState = #http_state{action = create_session, config = #config{he
     _Pid = socketio_session:create(Sid, SessionTimeout, Callback, Opts),
     Pid = socketio_session:create(Sid, SessionTimeout, Callback, Opts),
 
-    % Adding this to be able to get client IP in bh_context
-    Pid ! {'req', Req},
+    % Adding this to be able to get client IP
+    {{Ip, _}, _} = cowboy_req:peer(Req),
+    Pid ! {'peer_ip', Ip},
 
     Result = <<":", HeartbeatTimeoutBin/binary, ":", SessionTimeoutBin/binary, ":websocket,xhr-polling">>,
     {ok, Req1} = cowboy_req:reply(200, text_headers(), <<Sid/binary, Result/binary>>, Req),
